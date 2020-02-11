@@ -155,4 +155,31 @@ endpoint, the HTTP API, and optionally state history plugin websocket.
 Also nodeos is typically establishing outgoing TCP connections to its
 p2p peers as specified in its configuration.
 
+Further in this guide, we utilize the state history plugin, so the
+nodeos process will listen to 3 TCP sockets. You may typically decide
+to configure corresponding binding addresses as `0.0.0.0` or
+`127.0.0.1`, depending on how you plan the connectivity.
+
+Chronicle process will need to connect to the state history endpoint,
+so the binding address and port should be reachable for it.
+
+
+## Telos node example
+
+Telos uses vanilla EOSIO software, so binary packages from EOSIO
+GitHub reporitory will work. Few other networks require their own
+versions of EOSIO (such as BIS and WAX).
+
+The [tools.eosmetal.io](https://tools.eosmetal.io/snapshots) website
+provides fresh portable snapshots for Telos mainnet and testnet, as
+well as a [list of p2p
+endpoints](https://tools.eosmetal.io/nodestatus/telos).
+
+Typically you download the most recent snapshot according to your
+requirements: if your application needs to collect the historical data
+starting from some point in time, you download a snapshot from the day
+prior to that. Otherwise, you download the latest snapshot.
+
+
+
 

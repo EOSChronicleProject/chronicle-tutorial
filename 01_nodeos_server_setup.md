@@ -76,6 +76,12 @@ benefit from:
   according to applicatuion needs.
 
 
+LVM may or may not be used, and it's up to the system administrator to
+define the standard policy. Also some hosting providers, such as
+IONOS, are preconfiguring the servers with LVM so it's easier to use
+it than to remove it.
+
+
 ## Containers
 
 The system administrator needs to select a strategy for placing nodeos
@@ -106,5 +112,47 @@ processes for different purposes, and likely for different networks.
   deployment. The author does not have much experience with Docker,
   although many people prefer using it.`
 
+* KVM, Xen, VmWare virtualization: there is a certain overhead in CPU
+  operation, and typically full virtualization is not used in EOSIO
+  environment. However, it might be usable, especially if it's already
+  a part of standard IT processes.
+
+Further in this guide, LXC containers are used.
+
+
+## Network
+
+Network layout and security need to be planned carefully.
+
+In most hosting provider environments, the baremetal machines are
+directly facing the public internet without any firewalls in front of
+them. Some providers offer a firewall in front of a server, optionally
+or mandatory.
+
+Some hosting providers are offering floating IP addresses: an IP
+address can be dynamically assigned to one of your servers and
+switched over to your other server, based on some condition
+monitoring.
+
+Some hosting providers are offering load balancers in front of the
+servers. A load balancer is usually monitoring the connectivity to the
+backend servers and stops sending requests to a server that stops
+responding, or some custom monitoring condition is met. They also
+normally allow you to pause the traffic to one of servers and take ot
+out of service for maintenance and upgrades. Normally such a load
+balancer is only allowing backend servers belonghing to the same
+service provider and the same location.
+
+There are several DNS hosting providers offering geo-aware service:
+the query response depends on the region where the reuest was sent
+from. This allows you to set up several servers across the world,
+answering to the same DNS name. One of suchh providers is [DNS Masde
+Easy](https://dnsmadeeasy.com/).
+
+A nodeos process is typically listens on 2 or 3 TCP sockets: the p2p
+endpoint, the HTTP API, and optionally state history plugin websocket.
+
+Also nodeos is typically establishing outgoing TCP connections to its
+p2p peers as specified in its configuration.
 
 

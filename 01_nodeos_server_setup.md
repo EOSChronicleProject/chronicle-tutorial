@@ -418,8 +418,134 @@ EOT
 # In both cases, you start nodeos from command line, specifying either
 # snapshot or genesis file. Starting from genesis is very fast, while
 # starting from snapshot will take a few minutes. As soon as you see
-# the node's TCP port open in "netstat -an | grep LISTEN", it means
+# the node's TCP ports open in "netstat -an | grep LISTEN", it means
 # you can stop the process with Ctrl-C or "kill" command, and it's
 # ready for launching as a systemd service.
 
+# --disable-replay-opts option in nodeos is required for state history
+# plugin to work
+
+# ## start from genesis. Below is genesis file for Telos mainnet ##
+
+cat >/srv/telos/etc/genesis.json <<'EOT'
+{
+ "initial_key": "EOS52vfcN43YHHU8Akh7VyfBdnDiMg15dPTELosWG9SR86ssBoU1T",
+ "initial_configuration": {
+   "max_transaction_delay": 3888000,
+   "min_transaction_cpu_usage": 100,
+   "net_usage_leeway": 500,
+   "context_free_discount_net_usage_den": 100,
+   "max_transaction_net_usage": 524288,
+   "context_free_discount_net_usage_num": 20,
+   "max_transaction_lifetime": 3600,
+   "deferred_trx_expiration_window": 600,
+   "max_authority_depth": 6,
+   "max_transaction_cpu_usage": 5000000,
+   "max_block_net_usage": 1048576,
+   "target_block_net_usage_pct": 1000,
+   "max_generated_transaction_count": 16,
+   "max_inline_action_size": 4096,
+   "target_block_cpu_usage_pct": 1000,
+   "base_per_transaction_net_usage": 12,
+   "max_block_cpu_usage": 50000000,
+   "max_inline_action_depth": 4
+ },
+ "initial_timestamp": "2018-12-12T10:29:00.000"
+}
+EOT
+
+/usr/bin/nodeos --data-dir /srv/telos/data --config-dir /srv/telos/etc \
+ --disable-replay-opts --genesis-json=/srv/telos/etc/genesis.json &
+
+# nodeos started in background. Check the TCP ports with
+# "netstat -an | grep LISTEN" and wait till nodeos starts listening
+# on configured ports. When it is so, execure "kill %1" to stop the
+# background job.
+
+
+# ## start from snapshot ##
+
+# Find the most recent snapshot at https://tools.eosmetal.io/snapshots
+# download and unpack it
+
+cd /var/local
+wget https://eosmetal.io/snapshots/telos/2019-09-04-12-00-23-v1.8.2.tar.gz
+tar xzvf 2019-09-04-12-00-23-v1.8.2.tar.gz
+
+# start nodeos from snapthos. See the instructions about netstat above.
+
+/usr/bin/nodeos --data-dir /srv/telos/data --config-dir /srv/telos/etc --disable-replay-opts \
+ --snapshot=opt/telos/data-dir/snapshots/snapshot-02b8df5ac8e9b622eea6d2f9e0ecbee6b4eb6c62d3de3c7ad621d12930589a67.bin 
+
+# once the TCP ports are visible in netstat output, stop the background p[rocess with "kill %1"
+
+# ## systemd service ##
+
+# Now nodeos is ready to run as a service. Create a systemd unit file
+# and activate the service. There are two options of your preference:
+# one unit file per nodeos process, or a template unit file using the
+# "@" symbol and %i as service identifier. Below example is
+# illustrating one unit file per nodeos process:
+
+
+cat >/etc/systemd/system/telos.service <<'EOT'
+[Unit]
+Description=Telos
+[Service]
+Type=simple
+ExecStart=/usr/bin/nodeos --data-dir /srv/telos/data --config-dir /srv/telos/etc --disable-replay-opts
+TimeoutStartSec=30s
+TimeoutStopSec=300s
+Restart=no
+User=root
+Group=daemon
+KillMode=control-group
+[Install]
+WantedBy=multi-user.target
+EOT
+
+# reload systemd so that it sees the new unit file
+systemctl daemon-reload
+
+# enable automatic start and start the daemon
+systemctl enable telos
+systemctl start telos
+
+# watch the nodeos log
+journalctl -u telos -f
+
+# check the node synchronization status
+date; cleos -u http://127.0.0.1:8881 get info
+
+
+# restart and find the start block number in state history archive:
+systemctl restart telos
+journalctl -u telos
+
+# the startup log lines should look like:
+Feb 22 22:58:03 eosio nodeos[22003]: info  2020-02-22T22:58:03.264 nodeos    state_history_log.hpp:215     open_log             ] trace_history.log has blocks 68997517-75193929
+Feb 22 22:58:03 eosio nodeos[22003]: info  2020-02-22T22:58:03.274 nodeos    state_history_log.hpp:215     open_log             ] chain_state_history.log has blocks 68997517-75193929
+
+# take a note of the start block number, you will need it to initialize Chronicle,
+
+# now wait till the node synchronizes
 ```
+
+
+## Monitoring tools
+
+If you are using Nagios or Icinga for service monitoring, [eos-nagios-plugins
+scripts](https://github.com/cc32d9/eos-nagios-plugins) will be useful
+for nodeos health checkup.
+
+Also
+[eosio_net_monitor](https://github.com/eos-amsterdam-rnd/eosio_net_monitor)
+will be useful to see the status of your p2p peers.
+
+
+
+
+
+
+
+

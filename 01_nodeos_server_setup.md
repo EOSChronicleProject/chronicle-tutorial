@@ -71,7 +71,7 @@ benefit from:
   performance.
 
 * easy creation of as many filesystem as needed, and each filesystem
-  would have its own mounting poiint, record size, caching policy, and
+  would have its own mounting point, record size, caching policy, and
   compression settings. This allows fine-tuning of the storage
   according to applicatuion needs.
 
@@ -80,6 +80,17 @@ LVM may or may not be used, and it's up to the system administrator to
 define the standard policy. Also some hosting providers, such as
 IONOS, are preconfiguring the servers with LVM so it's easier to use
 it than to remove it.
+
+`nodeos` requires access to its state shared memory with minimum
+possible delay. So, the `state/` folder in its data directory should
+reside on SSD or NVMe storage. Other directories, such as `blocks` and
+`state-history`, are quite low on I/O performance requirements, and
+hard disks are performing well for this job. Also the blocks log and
+state history may require signinicant storage space.
+
+In most tasks which are related to Chronicle, you would only be
+interested in newest blockchain history, and the old one can
+periodically truncated. This allows saving on hosting costs.
 
 
 ## Containers
@@ -124,8 +135,8 @@ Further in this guide, LXC containers are used.
 
 Network layout and security need to be planned carefully.
 
-In most hosting provider environments, the baremetal machines are
-directly facing the public internet without any firewalls in front of
+In most hosting provider environments, baremetal machines are directly
+facing the public internet without any firewalls in front of
 them. Some providers offer a firewall in front of a server, optionally
 or mandatory.
 
@@ -146,7 +157,7 @@ service provider and the same location.
 There are several DNS hosting providers offering geo-aware service:
 the query response depends on the region where the reuest was sent
 from. This allows you to set up several servers across the world,
-answering to the same DNS name. One of suchh providers is [DNS Masde
+answering to the same DNS name. One of suchh providers is [DNS Made
 Easy](https://dnsmadeeasy.com/).
 
 A nodeos process is typically listens on 2 or 3 TCP sockets: the p2p
@@ -168,7 +179,7 @@ so the binding address and port should be reachable for it.
 
 Telos uses vanilla EOSIO software, so binary packages from EOSIO
 GitHub reporitory will work. Few other networks require their own
-versions of EOSIO (such as BIS and WAX).
+versions of EOSIO (such as BOS and WAX).
 
 The [tools.eosmetal.io](https://tools.eosmetal.io/snapshots) website
 provides fresh portable snapshots for Telos mainnet and testnet, as
@@ -180,6 +191,235 @@ requirements: if your application needs to collect the historical data
 starting from some point in time, you download a snapshot from the day
 prior to that. Otherwise, you download the latest snapshot.
 
+In this example, we have one storage volume and create one ZFS pool on
+it: "zdata".
+
+If your server has both SSD and HDD arrays, you may create two
+separate ZFS pools (call it "zfast" and "zslow", for example), and use
+the fast one for nodeos state. The rest can reside on HDD without much
+impact on performance.
 
 
+```
+apt-get update && apt-get install -y aptitude git lxc-utils zfsutils-linux \
+ netfilter-persistent sysstat ntp
 
+# Example for a dedicated host at IONOS: most of the storage space is
+# unallocated and under LVM, so we create a new volume group for all
+# available space:
+
+lvcreate -n zdata -l 100%FREE vg00
+
+# create a ZFS pool with compression enabled by default
+zpool create zdata /dev/vg00/zdata
+zfs set atime=off zdata
+zfs set compression=lz4 zdata
+
+# this tells the LXC DHCP service to read the config file for static
+# IP address assignment:
+
+sed -i -e 's,^.*LXC_DHCP_CONFILE,LXC_DHCP_CONFILE,' /etc/default/lxc-net
+cat >/etc/lxc/dnsmasq.conf <<'EOT'
+EOT
+systemctl restart lxc-net
+
+
+###########   EOSIO container   #############
+
+# "eosio" container will use this IP address on internal virtual bridge.
+cat >>/etc/lxc/dnsmasq.conf <<'EOT'
+dhcp-host=eosio,10.0.3.20
+EOT
+systemctl restart lxc-net
+
+zfs create -o mountpoint=/var/lib/lxc/eosio -o compression=lz4 zdata/eosio
+
+# Telos node with data in /srv/telos/data
+
+# blocks and snapshots are compressing well, so we enable compression by default
+zfs create -o mountpoint=/var/lib/lxc/eosio/rootfs/srv/telos/data \
+ -o compression=lz4 zdata/eosio/telos_data
+
+# state history is compressed on data level, so filesystem compression
+# will not add any benefits
+zfs create -o mountpoint=/var/lib/lxc/eosio/rootfs/srv/telos/data/state-history \
+ zdata/eosio/telos_ship
+
+# nodeos state is read and written randomly in 4k pages, so the record size is
+# adjusted accordingly. The data is virtual memory mapped to a file, so no need
+# to cache its content on ZFS level.
+zfs create -o mountpoint=/var/lib/lxc/eosio/rootfs/srv/telos/data/state \
+ -o recordsize=4k -o primarycache=metadata -o compression=lz4 zdata/eosio/telos_state
+
+
+# this command sometimes failes because PGP key server is too busy. In
+# this case, you need to delete /var/lib/lxc/eosio/config and try again
+lxc-create -n eosio -t download -- --dist ubuntu --release bionic --arch amd64
+
+# this will start the container automatically with the host
+echo "lxc.start.auto = 1" >> /var/lib/lxc/eosio/config
+
+lxc-start -n eosio
+lxc-attach -n eosio
+
+# now we're in a shell within the container. LXC creates the user
+# "ubuntu" by default, which is not needed
+apt-get update && apt-get install -y git openssh-server net-tools
+userdel -rf ubuntu
+exit
+
+# here we assume that root on the host has authorized keys in its
+# .ssh/ folder, and you want the same keys to access the container via
+# local SSH. You may want a different security policy instead.
+cp -a /root/.ssh/ /var/lib/lxc/eosio/rootfs/root/
+ssh -A root@10.0.3.20
+
+
+# you need to check for the latest EOSIO software release at
+#  https://github.com/EOSIO/eos/releases
+
+cd /var/local
+wget https://github.com/EOSIO/eos/releases/download/v2.0.3/eosio_2.0.3-1-ubuntu-18.04_amd64.deb
+apt install -y ./eosio_2.0.3-1-ubuntu-18.04_amd64.deb
+
+
+# Now we need to create nodeos configuration. There's a number of
+# parameters that may vary, depending on your requirements:
+
+# http-server-address, p2p-listen-endpoint, and state-history-endpoint
+# define the TCP ports that your node would listen to, for HTTP, p2p,
+# and state history requests, correspondingly.
+
+# sync-fetch-span defines how many blocks your node will request from
+# p2p peers when resynching with the network.
+
+# p2p peer addresses: they EOSIO 2.0 is handling the peer traffic much
+# more efficiently than 1.8, so a server may easily handle 20-30
+# peers. You need to retrieve a fresh list of p2p endpoints. For
+# example, https://tools.eosmetal.io/nodestatus/telos is a good source
+# of them.
+
+# contracts-console and trace-history-debug-mode: if both are set to
+# true, the state history traces will contain the ouput of "print"
+# statements within smart contracts.
+
+# read-mode: if set to "read-only", the node will only process blocks
+# signed by block producers. It will not process any speculative
+# transactions and will not accept push_transaction API call. This
+# parameter also allows you to set the node in irreversible-only mode,
+# which is needed only rarely.
+
+mkdir /srv/telos/etc/
+
+cat >/srv/telos/etc/config.ini <<'EOT'
+chain-state-db-size-mb = 65536
+reversible-blocks-db-size-mb = 2048
+
+wasm-runtime = eos-vm-jit
+eos-vm-oc-enable = true
+read-mode = read-only
+
+http-server-address = 0.0.0.0:8881
+p2p-listen-endpoint = 0.0.0.0:9851
+
+access-control-allow-origin = *
+contracts-console = true
+
+plugin = eosio::chain_plugin
+plugin = eosio::chain_api_plugin
+
+plugin = eosio::state_history_plugin
+trace-history = true
+chain-state-history = true
+trace-history-debug-mode = true
+state-history-endpoint = 0.0.0.0:8081
+
+sync-fetch-span = 200
+
+p2p-peer-address = peer.telos.alohaeos.com:9876
+p2p-peer-address = p2p.telosvoyager.io:9876
+p2p-peer-address = mainnet.get-scatter.com:9876
+p2p-peer-address = p2p.telos.africa:9877
+p2p-peer-address = p2p.telosuk.io:9876
+p2p-peer-address = telosseed.ikuwara.com:9876
+p2p-peer-address = seed.tlos.goodblock.io:9876
+p2p-peer-address = telos.eossweden.eu:8012
+p2p-peer-address = p2p2.telos.telosgreen.com:9877
+p2p-peer-address = node2.emea.telosglobal.io:9876
+p2p-peer-address = api.telos.kitchen:9876
+p2p-peer-address = p2p.telosarabia.net:9876
+p2p-peer-address = peer1-telos.eosphere.io:9876
+p2p-peer-address = peer2-telos.eosphere.io:9876
+p2p-peer-address = telosapi.eosmetal.io:29877
+p2p-peer-address = telosp2p.eoscafeblock.com:9120
+p2p-peer-address = p2p.theteloscope.io:9876
+p2p-peer-address = telosp2p.eos.barcelona:9876
+p2p-peer-address = telos.caleos.io:9880
+p2p-peer-address = node1.apac.telosglobal.io:9876
+p2p-peer-address = p2p-telos-21zephyr.maltablock.org:9876
+EOT
+
+
+# By default, nodeos is pretty verbose. This logging configuration
+# leaves only errors:
+
+cat >/srv/telos/etc/logging.json <<'EOT'
+{
+  "includes": [],
+  "appenders": [{
+      "name": "consoleout",
+      "type": "console",
+      "args": {
+        "stream": "std_out",
+        "level_colors": [{
+            "level": "debug",
+            "color": "green"
+          },{
+            "level": "warn",
+            "color": "brown"
+          },{
+            "level": "error",
+            "color": "red"
+          }
+        ]
+      },
+      "enabled": true
+    }
+  ],
+  "loggers": [{
+      "name": "default",
+      "level": "error",
+      "enabled": true,
+      "additivity": false,
+      "appenders": [
+        "consoleout"
+      ]
+    }
+  ]
+}
+EOT
+
+
+# Now, you have two options to launch your node:
+
+# 1). starting from genesis will produce the whole history of the
+# blockchain.  synchronization will take a few days. If you plan do do
+# so, leave only one or two p2p peers in your configuration,. and
+# these peers shoudl not be geographically too far. This will help you
+# increase the resync speed.
+
+# 2). starting from snapshot. https://tools.eosmetal.io/snapshots
+# provides a good list of snapshots for few months into the past. This
+# will allow you process all the state history data starting from the
+# snapshot block. Plus, the beginning of state history archive will
+# contain table deltas for all tables, so you would get a full copy of
+# state in the history archive.
+
+# In both cases, you start nodeos from command line, specifying either
+# snapshot or genesis file. Starting from genesis is very fast, while
+# starting from snapshot will take a few minutes. As soon as you see
+# the node's TCP port open in "netstat -an | grep LISTEN", it means
+# you can stop the process with Ctrl-C or "kill" command, and it's
+# ready for launching as a systemd service.
+
+```

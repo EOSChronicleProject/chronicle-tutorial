@@ -60,7 +60,7 @@ benefit from:
 * Fast and cheap snapshots. It takes a fraction of a second to create
   a new snapshot of a ZFS filesystem, and the snapshot is very
   economical for nodeos data because most of it is append-only (except
-  for state file hich is randomly written). The snapshot content can
+  for state file which is randomly written). The snapshot content can
   later be copied to spme other media or remote location without
   interrupting the service.
 
@@ -424,6 +424,11 @@ EOT
 
 # --disable-replay-opts option in nodeos is required for state history
 # plugin to work
+
+# After starting a node, you will likely see many errors related to
+# p2p peers rejecting connections. This is normal, as many public
+# endpointts are limited in capacity. Your node will still need to
+# have a few peers connected for stable operation.
 
 # ## start from genesis. Below is genesis file for Telos mainnet ##
 

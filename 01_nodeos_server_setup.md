@@ -61,7 +61,7 @@ benefit from:
   a new snapshot of a ZFS filesystem, and the snapshot is very
   economical for nodeos data because most of it is append-only (except
   for state file which is randomly written). The snapshot content can
-  later be copied to spme other media or remote location without
+  later be copied to some other media or remote location without
   interrupting the service.
 
 * Fast lz4 compression. Even on fast NVMe, the compression does not

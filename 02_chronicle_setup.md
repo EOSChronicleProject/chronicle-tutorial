@@ -1,4 +1,4 @@
-# Chapter 2. Chronicle setup
+# Chapter 2. Setting up Chronicle
 
 ## Introduction
 
@@ -166,7 +166,113 @@ several possibilities how to handle the consumer:
   specified end block.
   
 
-## Installatoin example
+## Installation example
+
+The example assumes `nodeos` coniguration as provided in [Chapter
+1](01_nodeos_server_setup.md), and the consumer is taken from
+[chronicle-consumer NPM
+test scripts](https://github.com/EOSChronicleProject/chronicle-consumer-npm).
+
+
+```
+## chronicle container (Ubuntu 18.10)
+
+cat >>/etc/lxc/dnsmasq.conf <<'EOT'
+dhcp-host=lightapi,10.0.3.21
+EOT
+systemctl restart lxc-net
+
+zfs create -o mountpoint=/var/lib/lxc/chronicle zdata/chronicle
+
+lxc-create -n chronicle -t download -- --dist ubuntu --release cosmic --arch amd64
+
+lxc-start -n chronicle
+lxc-attach -n chronicle
+
+apt-get update && apt-get install -y git openssh-server net-tools
+userdel -rf ubuntu
+exit
+
+cp -a .ssh/ /var/lib/lxc/chronicle/rootfs/root/
+
+ssh -A root@10.0.3.21
+
+
+apt update && \
+apt install -y git g++ cmake libboost-dev libboost-thread-dev libboost-test-dev \
+ libboost-filesystem-dev libboost-date-time-dev libboost-system-dev libboost-iostreams-dev \
+ libboost-program-options-dev libboost-locale-dev libssl-dev libgmp-dev
+
+mkdir /opt/src
+cd /opt/src
+git clone https://github.com/EOSChronicleProject/eos-chronicle.git
+cd eos-chronicle
+git submodule update --init --recursive
+mkdir build
+cd build
+cmake ..
+make -j 6 install
+
+
+mkdir -p /srv/telos/chronicle-config
+
+cat >/srv/telos/chronicle-config/config.ini <<'EOT'
+host = 10.0.3.20
+port = 8081
+mode = scan
+plugin = exp_ws_plugin
+exp-ws-host = 127.0.0.1
+exp-ws-port = 8855
+exp-ws-bin-header = true
+skip-block-events = true
+EOT
+
+
+# set up the unit file and enable automatic startup
+cp /opt/src/eos-chronicle/systemd/chronicle_receiver\@.service /etc/systemd/system/
+systemctl daemon-reload
+systemctl enable chronicle_receiver@telos
+
+
+# assuming that block 68997517 is the first in the snapshot (you can
+# see that in state_history message if you restart nodeos)
+
+# we start Chronicle to process the beginning of snapshot. It will
+# take about 15-20 minutes and stop by itself.
+
+/usr/local/sbin/chronicle-receiver --config-dir=/srv/telos/chronicle-config \
+ --data-dir=/srv/telos/chronicle-data --start-block=68997517 --end-block=68997527 \
+ --mode=scan-noexport
+
+
+# Install nodejs
+curl -sL https://deb.nodesource.com/setup_12.x | bash -
+apt install -y nodejs
+
+# Get the NPM test scripts
+cd /opt
+git clone https://github.com/EOSChronicleProject/chronicle-consumer-npm.git
+cd chronicle-consumer-npm
+npm install
+
+# start Chronicle as service
+systemctl start chronicle_receiver@telos
+
+# if needed, check the logs of Chronicle. Now the consumer is not
+# running, so Chronicle will stop:
+journalctl -u chronicle_receiver@telos -f
+
+
+# launch the consumer. Systemd will restart Chronicle automatically
+# every 10 seconds, so you should see new messages within a short
+# time:
+
+node tests/print_transfers.js
+
+```
+
+More examples are available in [chronicle-consumer NPM examples
+repository](https://github.com/EOSChronicleProject/chronicle-consumer-npm-examples).
 
 
 

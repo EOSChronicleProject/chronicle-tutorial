@@ -19,6 +19,7 @@ daemon [developed by Block One](https://developers.eos.io/).
 
 * [Chapter 1. Setting up a nodeos server](01_nodeos_server_setup.md)
 
+* [Chapter 2. Setting up Chronicle](02_chronicle_setup.md)
 
 
 
@@ -26,7 +27,7 @@ daemon [developed by Block One](https://developers.eos.io/).
 
 ## Copyright and License
 
-Copyright 2018 cc32d9@gmail.com
+Copyright 2020 cc32d9@gmail.com
 
 This work is licensed under a Creative Commons Attribution 4.0
 International License.

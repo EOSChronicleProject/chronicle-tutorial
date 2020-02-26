@@ -1,9 +1,12 @@
 # Chronicle tutorial
 
-This repository contains a comprehensive guide for a dApp developer or
-system administrator to plan and set up a server and start using
-Chronicle for data collection from an EOSIO blockchain, such as Telos
-mainnet.
+This tutorial aims giving an EOSIO dApp developer clear guidelines how
+to set up a blockchain server and start collecting data for an
+application. This includes historical and real-time data, such as
+transaction traces and contract table contents.
+
+Examples in this tutorial are made for telos mainnet. Users of other
+EOSIO blockchains need to adapt their setup accordingly.
 
 This development is sponsored by [Telos
 blockchain](https://www.telos.net/) community as part of [Worker
@@ -14,6 +17,12 @@ software package for receiving and decoding the data flow that is
 exported by `state_history_plugin` of `nodeos`, the blockchain node
 daemon [developed by Block One](https://developers.eos.io/).
 
+[`chronicle-consumer
+NPM`](https://www.npmjs.com/package/chronicle-consumer) is a Node.js
+module for a server-side application that needs to receive blockchain
+updates from Chronicle. It comes along with a number of
+[examples](https://github.com/EOSChronicleProject/chronicle-consumer-npm-examples)
+that illustrate how to collect data for some dApps on Telos.
 
 ## Contents
 

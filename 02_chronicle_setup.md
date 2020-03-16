@@ -48,8 +48,8 @@ round-trip delay of few hundred milliseconds is still acceptable.
 
 Chronicle uses libraries that require a specific version of C++ Boost
 library and a GCC compiler version that is not delivered with Ubuntu
-18.04. These versions are available in Ubuntu 18.10, so the easiest
-way to set up Chronicle is to launch an Ubuntu 18.10 container on your
+18.04. These versions are available in Ubuntu 19.10, so the easiest
+way to set up Chronicle is to launch an Ubuntu 19.10 container on your
 host. Further examples illustrate it with an LXC container, and there
 are also Dicker files supported by community.
 
@@ -90,7 +90,7 @@ to connect to a consumer.
 
 ## Setting up Chronicle
 
-Installation procedure for Ubuntu 18.10 and 18.04 is described on
+Installation procedure for Ubuntu 19.10 and 18.04 is described on
 Chronicle page in detail.
 
 The GitHub repository comes with a systemd unit file that is suitable
@@ -175,7 +175,7 @@ test scripts](https://github.com/EOSChronicleProject/chronicle-consumer-npm).
 
 
 ```
-## chronicle container (Ubuntu 18.10)
+## chronicle container (Ubuntu 19.10)
 
 cat >>/etc/lxc/dnsmasq.conf <<'EOT'
 dhcp-host=lightapi,10.0.3.21
@@ -184,7 +184,7 @@ systemctl restart lxc-net
 
 zfs create -o mountpoint=/var/lib/lxc/chronicle zdata/chronicle
 
-lxc-create -n chronicle -t download -- --dist ubuntu --release cosmic --arch amd64
+lxc-create -n chronicle -t download -- --dist ubuntu --release eoan --arch amd64
 
 lxc-start -n chronicle
 lxc-attach -n chronicle
@@ -201,7 +201,7 @@ ssh -A root@10.0.3.21
 apt update && \
 apt install -y git g++ cmake libboost-dev libboost-thread-dev libboost-test-dev \
  libboost-filesystem-dev libboost-date-time-dev libboost-system-dev libboost-iostreams-dev \
- libboost-program-options-dev libboost-locale-dev libssl-dev libgmp-dev
+ libboost-program-options-dev libboost-locale-dev libssl-dev libgmp-dev zlib1g-dev
 
 mkdir /opt/src
 cd /opt/src

@@ -8,9 +8,9 @@ with other nodes via p2p protocol, providing HTTP API for client
 software, and optionally signing blocks if it belongs to a block
 producer.
 
-Further in this guide, we're only considerinhg non-producing nodes. A
+Further in this guide, we're only considering non-producing nodes. A
 detailed explanation of node roles and functions is available in the
-[Antelope Developers's
+[Antelope Developer's
 Handbook](https://cc32d9.gitbook.io/antelope-smart-contract-developers-handbook/).
 
 `nodeos` is available in source code and binary packages at the [Leap
@@ -22,17 +22,17 @@ platforms are Ubuntu 18.04, 20.04, and 22.04.
 
 A server should be planned in accordance with the network
 requirements: busy networks like EOS, Telos and WAX require a
-baremetal server with directly attached SSD or NVMe. Some hosting
+bare-metal server with directly attached SSD or NVMe. Some hosting
 providers allow a combination of HDD and SSD in the same physical
 server, and blocks log and state history archive can be stored on hard
 disks.
 
 As of beginning of 2023, the WAX blockchain has the largest state
 among public networks, occupying about 100GB. Also the intensity of
-transactions is so high that in default state mappimg mode (state
-mapped to a file on NVS storage) the speed of storage is sometimes not
+transactions is so high that in default state mapping mode (state
+mapped to a file on NVMe storage) the speed of storage is sometimes not
 high enough, and the drives are worn off relatively quickly. An
-enterprise grade NVME drive could be desroyed within a few months.
+enterprise grade NVME drive could be destroyed within a few months.
 
 The current recommended setup for a WAX node is utilizing a `tmpfs`
 partition for the state directory. The tmpfs filesystem maps its
@@ -71,7 +71,7 @@ few:
 
 * IONOS: multiple locations in Europe, one location in USA, fixed
   server configurations, minute billing, immediate provisioning and
-  ceasing. The OS installer does not allow any customizig in the
+  ceasing. The OS installer does not allow any customizing in the
   storage layout, so it's not convenient for long-term blockhain
   nodes. Also some network stability issues have been known in the
   past.
@@ -81,7 +81,7 @@ few:
   minutes.
 
 * Vultr: baremetal servers available in many locations around the
-  globe. Only a few standard configuations are available, and storage
+  globe. Only a few standard configurations are available, and storage
   partitioning is also limited in options.
 
 * OVH: a large variety of baremetal servers around the globe,
@@ -100,7 +100,7 @@ ZFS is a filesystem developed by Sun Microsystems and used in their
 Solaris OS. The filesystem has been ported onto Linux kernel, and is
 available out of the box in Ubuntu 18.04
 
-Other filesystems of choise would be ext4 and XFS. They are stable and
+Other filesystems of choice would be ext4 and XFS. They are stable and
 performing well, although ZFS offers a number of unique features to
 benefit from:
 
@@ -120,7 +120,7 @@ benefit from:
 * easy creation of as many filesystems as needed, and each filesystem
   would have its own mounting point, record size, caching policy, and
   compression settings. This allows fine-tuning of the storage
-  according to applicatuion needs.
+  according to application needs.
 
 
 ## tmpfs Filesystem
@@ -201,15 +201,15 @@ monitoring.
 
 Some hosting providers are offering load balancers in front of the
 servers. A load balancer is usually monitoring the connectivity to the
-backend servers and stops sending requests to a server that stops
+back-end servers and stops sending requests to a server that stops
 responding, or some custom monitoring condition is met. They also
 normally allow you to pause the traffic to one of servers and take it
 out of service for maintenance and upgrades. Normally such a load
-balancer is only allowing backend servers belonghing to the same
+balancer is only allowing back-end servers belonging to the same
 service provider and the same location.
 
 There are several DNS hosting providers offering geo-aware service:
-the query response depends on the region where the reuest was sent
+the query response depends on the region where the request was sent
 from. This allows you to set up several servers across the world,
 answering to the same DNS name. One of such providers is
 [DNScaster](https://dnscaster.com/).
@@ -232,7 +232,7 @@ so the binding address and port should be reachable for it.
 ## Telos node example
 
 Telos uses vanilla Antelope software, so binary packages from Antelope
-GitHub reporitory will work. Few other networks require their own
+GitHub repository will work. Few other networks require their own
 customized versions of Antelope (such as WAX and FIO).
 
 The [snapshots service by EOS Nation](https://snapshots.eosnation.io/)
@@ -250,7 +250,7 @@ the same time, but this example shows the Telos part only.
 
 A part of NVME drives is occupied by the OS, then we allocate a 128GB
 partition for swap space on each drive, and the rest is used by ZFS
-"zfast" pool, which is ised for the LXC containers.
+"zfast" pool, which is used for the LXC containers.
 
 The hard drives are used by "zslow" ZFS pool, and here we store the
 blocks log and state history.
@@ -294,29 +294,29 @@ systemctl restart lxc-net
 
 ###########   Antelope container   #############
 
-# "eosio" container will use this IP address on internal virtual bridge.
+# "antelope" container will use this IP address on internal virtual bridge.
 cat >>/etc/lxc/dnsmasq.conf <<'EOT'
-dhcp-host=eosio,10.0.3.20
+dhcp-host=antelope,10.0.3.20
 EOT
 systemctl restart lxc-net
 
-zfs create -o mountpoint=/var/lib/lxc/eosio -o compression=lz4 zfast/eosio
+zfs create -o mountpoint=/var/lib/lxc/antelope -o compression=lz4 zfast/antelope
 
 # Telos node with data in /srv/telos/data
 
 # blocks and snapshots are compressing well, so we enable compression by default
-zfs create -o mountpoint=/var/lib/lxc/eosio/rootfs/srv/telos/data \
- -o compression=lz4 zslow/eosio/telos_data
+zfs create -o mountpoint=/var/lib/lxc/antelope/rootfs/srv/telos/data \
+ -o compression=lz4 zslow/antelope/telos_data
 
 # state history is compressed on data level, so filesystem compression
 # will not add any benefits
-zfs create -o mountpoint=/var/lib/lxc/eosio/rootfs/srv/telos/data/state-history \
- -o compression=off zslow/eosio/telos_ship
+zfs create -o mountpoint=/var/lib/lxc/antelope/rootfs/srv/telos/data/state-history \
+ -o compression=off zslow/antelope/telos_ship
 
 # nodeos state in tmpfs. Note the mount sequence, as we need ZFS to come first
-mkdir -p /var/lib/lxc/eosio/rootfs/srv/telos/data/state
+mkdir -p /var/lib/lxc/antelope/rootfs/srv/telos/data/state
 cat >>/etc/fstab <<'EOT'
-tmpfs   /var/lib/lxc/eosio/rootfs/srv/telos/data/state  tmpfs rw,nodev,nosuid,size=32G,x-systemd.after=zfs-mount.service 0  0
+tmpfs   /var/lib/lxc/antelope/rootfs/srv/telos/data/state  tmpfs rw,nodev,nosuid,size=32G,x-systemd.after=zfs-mount.service 0  0
 EOT
 
 # mount the tmpfs
@@ -327,13 +327,13 @@ mount -a
 reboot
 
 # Ubuntu 22.04 container for the nodes
-lxc-create -n eosio -t download -- --dist ubuntu --release jammy --arch amd64
+lxc-create -n antelope -t download -- --dist ubuntu --release jammy --arch amd64
 
 # this will start the container automatically with the host
-echo "lxc.start.auto = 1" >> /var/lib/lxc/eosio/config
+echo "lxc.start.auto = 1" >> /var/lib/lxc/antelope/config
 
-lxc-start -n eosio
-lxc-attach -n eosio
+lxc-start -n antelope
+lxc-attach -n antelope
 
 # now we're in a shell within the container. LXC creates the user
 # "ubuntu" by default, which is not needed
@@ -344,7 +344,7 @@ exit
 # here we assume that root on the host has authorized keys in its
 # .ssh/ folder, and you want the same keys to access the container via
 # local SSH. You may want a different security policy instead.
-cp -a /root/.ssh/ /var/lib/lxc/eosio/rootfs/root/
+cp -a /root/.ssh/ /var/lib/lxc/antelope/rootfs/root/
 ssh -A root@10.0.3.20
 
 
@@ -359,7 +359,7 @@ apt install -y ./leap_3.2.2-ubuntu22.04_amd64.deb
 # Now we need to create nodeos configuration. There's a number of
 # parameters that may vary, depending on your requirements:
 
-# chain-state-db-size-mb needs to be big enough to accomodate for the
+# chain-state-db-size-mb needs to be big enough to accommodate for the
 # current blockchain state. It should also not exceed the size of
 # tmpfs partition.
 
@@ -373,11 +373,11 @@ apt install -y ./leap_3.2.2-ubuntu22.04_amd64.deb
 
 # p2p peer addresses: a server normally doesn't need more than 5-6
 # peers, and they should preferably be geographically close, for
-# faster resync. The tools like https://validate.eosnation.io/ provide
+# faster re-sync. The tools like https://validate.eosnation.io/ provide
 # automatically generated lists of peers for multiple networks.
 
 # contracts-console and trace-history-debug-mode: if both are set to
-# true, the state history traces will contain the ouput of "print"
+# true, the state history traces will contain the output of "print"
 # statements within smart contracts. This would occupy more space in
 # the state history archive, and it's rarely used.
 
@@ -472,7 +472,7 @@ EOT
 # the chain and p2p peer proximity. If you plan do do so, leave only
 # one or two p2p peers in your configuration, and these peers should
 # not be geographically too far. This will help you increase the
-# resync speed.
+# re-sync speed.
 
 # 2). starting from snapshot. https://snapshots.eosnation.io/ provides
 # a good list of daily snapshots. This will allow you to process all
@@ -493,7 +493,7 @@ EOT
 
 # After starting a node, you will likely see many errors related to
 # p2p peers rejecting connections. This is normal, as many public
-# endpointts are limited in capacity. Your node will still need to
+# endpoints are limited in capacity. Your node will still need to
 # have a few peers connected for stable operation.
 
 # ## start from genesis. Below is genesis file for Telos mainnet ##
@@ -530,22 +530,22 @@ EOT
 
 # nodeos started in background. Check the TCP ports with
 # "netstat -an | grep LISTEN" and wait till nodeos starts listening
-# on configured ports. When it is so, execure "kill %1" to stop the
+# on configured ports. When it is so, execute "kill %1" to stop the
 # background job.
 
 
-# ## start from snapshot ##
+# ## start from a snapshot ##
 
 cd /var/local
 wget https://pub.store.eosnation.io/telos-snapshots/snapshot-2022-11-29-23-telos-v4-0249634428.bin.zst
 zstd -d snapshot-2022-11-29-23-telos-v4-0249634428.bin.zst
 
-# start nodeos from the snapthot. See the instructions about netstat above.
+# start nodeos from the snapshot. See the instructions about netstat above.
 
 /usr/bin/nodeos --data-dir /srv/telos/data --config-dir /srv/telos/etc --disable-replay-opts \
  --snapshot=snapshot-2022-11-29-23-telos-v4-0249634428.bin
 
-# once the TCP ports are visible in netstat output, stop the background p[rocess with "kill %1"
+# once the TCP ports are visible in netstat output, stop the background process with "kill %1"
 
 # ## systemd service ##
 
@@ -606,11 +606,16 @@ If you are using Nagios or Icinga for service monitoring, [eos-nagios-plugins
 scripts](https://github.com/cc32d9/eos-nagios-plugins) will be useful
 for nodeos health checkup.
 
-Also
-[eosio_net_monitor](https://github.com/eos-amsterdam-rnd/eosio_net_monitor)
-will be useful to see the status of your p2p peers.
+## Load balancer setup
 
+A production environment would normally require multiple Antelope
+nodes running in parallel, and the load balancer should redirect the
+traffic in case of a node failure.
 
+This [set of haproxy checkers and
+examples](https://github.com/cc32d9/eosio-haproxy) is designed for
+providing a resilient state history service that connects the client
+only to the nodes that are in sync with the blockchain.
 
 
 
